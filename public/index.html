@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finsight — Daily Market Digest</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #080b12;
+      --bg-card:     #0e1420;
+      --bg-header:   #090d15;
+      --border:      #1e2738;
+      --border-soft: #161e2e;
+      --text:        #e2e8f0;
+      --text-muted:  #64748b;
+      --text-dim:    #94a3b8;
+      --green:       #22c55e;
+      --red:         #ef4444;
+      --accent:      #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.15);
+      --gold:        #f59e0b;
+      --ticker-h:    64px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+
+    .header {
+      background: var(--bg-header);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .logo-text {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--text);
+    }
+
+    .header-spacer { flex: 1; }
+
+    .timestamp {
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .btn-refresh {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 16px;
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .btn-refresh:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    .btn-refresh:active:not(:disabled) { transform: translateY(0); }
+    .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-refresh .spin {
+      display: none;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    .btn-refresh.loading .spin { display: block; }
+    .btn-refresh.loading .icon { display: none; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Ticker ──────────────────────────────────────────────────── */
+
+    .ticker-bar {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border-soft);
+      height: var(--ticker-h);
+      overflow: hidden;
+    }
+
+    .ticker-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .ticker-inner::-webkit-scrollbar { display: none; }
+
+    .coin-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 14px;
+      flex-shrink: 0;
+      min-width: 180px;
+    }
+
+    .coin-logo {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .coin-logo-placeholder {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .coin-info { display: flex; flex-direction: column; gap: 1px; }
+
+    .coin-symbol {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .coin-price {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .coin-change {
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: auto;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .coin-change.up   { color: var(--green); background: rgba(34,197,94,0.1); }
+    .coin-change.down { color: var(--red);   background: rgba(239,68,68,0.1); }
+    .coin-change.flat { color: var(--text-muted); background: var(--border-soft); }
+
+    .divider {
+      width: 1px;
+      height: 36px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .fg-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 14px;
+      flex-shrink: 0;
+    }
+
+    .fg-label { font-size: 11px; color: var(--text-muted); }
+    .fg-score {
+      font-size: 18px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+    .fg-sentiment { font-size: 11px; color: var(--text-dim); }
+
+    .fg-score.extreme-fear  { color: #ef4444; }
+    .fg-score.fear          { color: #f97316; }
+    .fg-score.neutral       { color: var(--gold); }
+    .fg-score.greed         { color: #84cc16; }
+    .fg-score.extreme-greed { color: var(--green); }
+
+    /* ── Loading state ───────────────────────────────────────────── */
+
+    .loading-banner {
+      display: none;
+      max-width: 1200px;
+      margin: 24px auto;
+      padding: 0 24px;
+    }
+
+    .loading-banner.visible { display: block; }
+
+    .loading-inner {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .loading-spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    .loading-text { color: var(--text-dim); font-size: 14px; }
+    .loading-text strong { color: var(--text); }
+
+    /* ── Empty / Error states ────────────────────────────────────── */
+
+    #empty-state, #error-state {
+      max-width: 1200px;
+      margin: 60px auto;
+      padding: 0 24px;
+      text-align: center;
+    }
+
+    .state-icon { font-size: 52px; margin-bottom: 16px; }
+    .state-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    .state-sub { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
+
+    #error-state .state-icon { color: var(--red); }
+    #error-msg { color: var(--red); font-size: 13px; font-family: monospace; }
+
+    /* ── Main grid ───────────────────────────────────────────────── */
+
+    #digest { display: none; }
+
+    .main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .card-full { grid-column: 1 / -1; }
+
+    @media (max-width: 768px) {
+      .cards-grid { grid-template-columns: 1fr; }
+      .card-full { grid-column: 1; }
+      .header-inner { padding: 0 16px; }
+      .ticker-inner { padding: 0 16px; }
+      .main { padding: 16px; }
+    }
+
+    /* ── Cards ───────────────────────────────────────────────────── */
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .card:hover { border-color: #2d3a52; }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .card-icon {
+      font-size: 18px;
+      width: 36px;
+      height: 36px;
+      background: var(--accent-glow);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .card-body {
+      padding: 20px;
+      font-size: 14px;
+      line-height: 1.75;
+      color: var(--text-dim);
+    }
+
+    /* Markdown styles within cards */
+    .card-body p { margin-bottom: 12px; color: var(--text-dim); }
+    .card-body p:last-child { margin-bottom: 0; }
+
+    .card-body ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .card-body li {
+      padding-left: 16px;
+      position: relative;
+      color: var(--text-dim);
+    }
+
+    .card-body li::before {
+      content: '▸';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-size: 11px;
+      top: 3px;
+    }
+
+    .card-body strong, .card-body b {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .card-body em, .card-body i { color: var(--text-dim); }
+
+    .card-body h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 16px 0 8px;
+    }
+
+    .card-body code {
+      background: var(--border-soft);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 12px;
+      font-family: monospace;
+      color: var(--gold);
+    }
+
+    /* Learn card special styling */
+    #card-learn .card-body {
+      font-size: 15px;
+      line-height: 1.8;
+    }
+
+    #card-learn .card-icon { background: rgba(245,158,11,0.12); }
+    #card-learn .card-title { color: var(--gold); }
+    #card-learn .card-header { border-bottom-color: rgba(245,158,11,0.1); }
+    #card-learn { border-color: rgba(245,158,11,0.15); }
+
+    /* Skeleton loader */
+    .skeleton {
+      height: 14px;
+      background: linear-gradient(90deg, var(--border) 25%, #1e2d40 50%, var(--border) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+
+    .skeleton:nth-child(2) { width: 85%; }
+    .skeleton:nth-child(3) { width: 92%; }
+    .skeleton:nth-child(4) { width: 78%; }
+
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ───────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header-inner">
+      <a class="logo" href="/">
+        <div class="logo-icon">📈</div>
+        <span class="logo-text">Finsight</span>
+      </a>
+      <div class="header-spacer"></div>
+      <span class="timestamp" id="timestamp">—</span>
+      <button class="btn-refresh" id="btn-refresh" onclick="refresh()">
+        <span class="spin"></span>
+        <span class="icon">⟳</span>
+        Regenerate Digest
+      </button>
+    </div>
+  </header>
+
+  <!-- ── Price Ticker ─────────────────────────────────────────── -->
+  <div class="ticker-bar">
+    <div class="ticker-inner" id="ticker">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+  <!-- ── Loading Banner ───────────────────────────────────────── -->
+  <div class="loading-banner" id="loading-banner">
+    <div class="loading-inner">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">
+        <strong>Synthesizing your morning digest…</strong><br>
+        Fetching live market data and calling Claude. This takes 20–40 seconds.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Empty State ──────────────────────────────────────────── -->
+  <div id="empty-state">
+    <div class="state-icon">🗞</div>
+    <div class="state-title">No digest yet</div>
+    <div class="state-sub">Click "Regenerate Digest" to fetch live data and generate your first AI-powered morning briefing.</div>
+  </div>
+
+  <!-- ── Error State ──────────────────────────────────────────── -->
+  <div id="error-state" style="display:none">
+    <div class="state-icon">⚠️</div>
+    <div class="state-title">Something went wrong</div>
+    <div class="state-sub">Check your API keys and network, then try again.</div>
+    <div id="error-msg"></div>
+  </div>
+
+  <!-- ── Digest ───────────────────────────────────────────────── -->
+  <div id="digest">
+    <div class="main">
+      <div class="cards-grid">
+
+        <!-- Market Snapshot -->
+        <div class="card" id="card-market">
+          <div class="card-header">
+            <div class="card-icon">📊</div>
+            <span class="card-title">Market Snapshot</span>
+          </div>
+          <div class="card-body" id="section-market">
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+          </div>
+        </div>
+
+        <!-- Macro Pulse -->
+        <div class="card" id="card-macro">
+          <div class="card-header">
+            <div class="card-icon">🏛️</div>
+            <span class="card-title">Macro Pulse</span>
+          </div>
+          <div class="card-body" id="section-macro">
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+          </div>
+        </div>
+
+        <!-- DeFi Alpha -->
+        <div class="card" id="card-defi">
+          <div class="card-header">
+            <div class="card-icon">🔷</div>
+            <span class="card-title">DeFi Alpha</span>
+          </div>
+          <div class="card-body" id="section-defi">
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+          </div>
+        </div>
+
+        <!-- Top Stories -->
+        <div class="card" id="card-stories">
+          <div class="card-header">
+            <div class="card-icon">📰</div>
+            <span class="card-title">Top Stories</span>
+          </div>
+          <div class="card-body" id="section-stories">
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+          </div>
+        </div>
+
+        <!-- One Thing to Learn Today (full width) -->
+        <div class="card card-full" id="card-learn">
+          <div class="card-header">
+            <div class="card-icon">🧠</div>
+            <span class="card-title">One Thing to Learn Today</span>
+          </div>
+          <div class="card-body" id="section-learn">
+            <div class="skeleton"></div>
+            <div class="skeleton"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Configure marked
+    marked.setOptions({ breaks: true, gfm: true });
+
+    // ── Section parsing ──────────────────────────────────────────
+
+    function parseDigest(text) {
+      console.log('[Finsight] Raw digest text:\n', text);
+
+      // Prepend \n so the very first "## 1. ..." header is split the same way
+      // as all subsequent ones — without this, section 1 lands in parts[0]
+      // (still carrying its own header) and the i=1 loop skips it entirely.
+      const parts = ('\n' + text.trim()).split(/\n## \d+\. /);
+
+      const sections = {};
+      for (let i = 1; i < parts.length; i++) {
+        const nl = parts[i].indexOf('\n');
+        if (nl === -1) continue;
+        const rawTitle = parts[i].slice(0, nl).trim();
+        const content  = parts[i].slice(nl + 1).trim();
+        const key      = rawTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+        sections[key]  = content;
+      }
+
+      console.log('[Finsight] Parsed section keys:', Object.keys(sections));
+      return sections;
+    }
+
+    // Map normalized keys → DOM element IDs (handles slight title variation)
+    const SECTION_MAP = [
+      { patterns: ['market_snapshot'],           id: 'section-market'  },
+      { patterns: ['macro_pulse'],               id: 'section-macro'   },
+      { patterns: ['defi_alpha', 'defi_alpha_', 'defi_alpha__'], id: 'section-defi' },
+      { patterns: ['top_stories'],               id: 'section-stories' },
+      { patterns: ['one_thing_to_learn_today'],  id: 'section-learn'   },
+    ];
+
+    function findSectionEl(key) {
+      for (const { patterns, id } of SECTION_MAP) {
+        if (patterns.some(p => key.startsWith(p) || key === p)) {
+          return document.getElementById(id);
+        }
+      }
+      return null;
+    }
+
+    // ── Ticker rendering ─────────────────────────────────────────
+
+    function formatPrice(n) {
+      if (n >= 1000) return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+      if (n >= 1)    return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+      return '$' + n.toFixed(4);
+    }
+
+    function fgClass(score) {
+      const s = parseInt(score);
+      if (s <= 24)  return 'extreme-fear';
+      if (s <= 44)  return 'fear';
+      if (s <= 55)  return 'neutral';
+      if (s <= 75)  return 'greed';
+      return 'extreme-greed';
+    }
+
+    function renderTicker(prices, fearGreed) {
+      const ticker = document.getElementById('ticker');
+      if (!prices || !prices.length) return;
+
+      const chips = prices.map(c => {
+        const chg = c.price_change_percentage_24h;
+        const dir = chg > 0.05 ? 'up' : chg < -0.05 ? 'down' : 'flat';
+        const sign = chg >= 0 ? '+' : '';
+        const img = c.image
+          ? `<img class="coin-logo" src="${c.image}" alt="${c.symbol}" loading="lazy">`
+          : `<div class="coin-logo-placeholder"></div>`;
+        return `
+          <div class="coin-chip">
+            ${img}
+            <div class="coin-info">
+              <span class="coin-symbol">${c.symbol}</span>
+              <span class="coin-price">${formatPrice(c.current_price)}</span>
+            </div>
+            <span class="coin-change ${dir}">${sign}${chg?.toFixed(2) ?? '—'}%</span>
+          </div>`;
+      }).join('');
+
+      let fgHtml = '';
+      if (fearGreed) {
+        fgHtml = `
+          <div class="divider"></div>
+          <div class="fg-chip">
+            <div>
+              <div class="fg-label">FEAR &amp; GREED</div>
+              <div class="fg-score ${fgClass(fearGreed.score)}">${fearGreed.score}</div>
+              <div class="fg-sentiment">${fearGreed.label}</div>
+            </div>
+          </div>`;
+      }
+
+      ticker.innerHTML = chips + fgHtml;
+    }
+
+    // ── Digest rendering ─────────────────────────────────────────
+
+    function renderDigest(data) {
+      renderTicker(data.prices, data.fearGreed);
+
+      if (data.timestamp) {
+        const d = new Date(data.timestamp);
+        document.getElementById('timestamp').textContent =
+          'Last updated: ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+
+      const sections = parseDigest(data.digest || '');
+
+      for (const [key, content] of Object.entries(sections)) {
+        const el = findSectionEl(key);
+        if (el) el.innerHTML = marked.parse(content);
+      }
+
+      document.getElementById('digest').style.display      = 'block';
+      document.getElementById('empty-state').style.display = 'none';
+      document.getElementById('error-state').style.display = 'none';
+    }
+
+    // ── Loading state ────────────────────────────────────────────
+
+    function setLoading(on) {
+      const btn    = document.getElementById('btn-refresh');
+      const banner = document.getElementById('loading-banner');
+      btn.disabled = on;
+      btn.classList.toggle('loading', on);
+      banner.classList.toggle('visible', on);
+    }
+
+    function showError(msg) {
+      document.getElementById('error-state').style.display = 'block';
+      document.getElementById('empty-state').style.display = 'none';
+      document.getElementById('error-msg').textContent     = msg || 'Unknown error';
+    }
+
+    // ── API calls ────────────────────────────────────────────────
+
+    async function loadDigest() {
+      try {
+        const res = await fetch('/api/digest');
+        if (res.ok) {
+          renderDigest(await res.json());
+        } else if (res.status !== 404) {
+          const { error } = await res.json().catch(() => ({}));
+          showError(error);
+        }
+        // 404 = no cache yet; empty-state stays visible
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    async function refresh() {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/refresh', { method: 'POST' });
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error || 'Refresh failed');
+        renderDigest(body);
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // ── Boot ─────────────────────────────────────────────────────
+
+    loadDigest();
+  </script>
+
+</body>
+</html>
